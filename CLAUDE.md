@@ -39,6 +39,7 @@ Go 后端开发者，在学习 Agent 模式。希望 Claude 提供指导和关�
 
 - 提交信息用中文
 - 格式：`类型: 简要描述改动`
+- 只写一句话总结整体改动，不要逐文件列出
 - 类型：feat / fix / refactor / docs / test
 - 示例：`feat: 实现 Chat 函数调用 Mimo API`
 - 示例：`fix: 修复 config.yaml 读取路径问题`
