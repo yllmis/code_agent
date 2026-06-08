@@ -61,7 +61,7 @@ func Chat(svc *svc.ServiceContext, messages []ChatMessage) (string, error) {
 	req := ChatRequest{
 		Model:               svc.Config.Model,
 		Messages:            messages,
-		MaxCompletionTokens: 4096,
+		MaxCompletionTokens: svc.Config.MaxCompletionTokens,
 	}
 
 	reqBody, err := json.Marshal(req)
