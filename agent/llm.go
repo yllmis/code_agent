@@ -72,6 +72,10 @@ func Chat(svc *svc.ServiceContext, messages []ChatMessage) (string, error) {
 	// base url
 	url := svc.Config.BaseURL + "/chat/completions"
 	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+
 	// header
 	httpReq.Header.Set("api-key", svc.Config.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -79,20 +83,25 @@ func Chat(svc *svc.ServiceContext, messages []ChatMessage) (string, error) {
 	// 请求
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("发送请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// 检查状态码
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("API 错误 %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	// 解析响应
 	var chatResp ChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", err
+		return "", fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	// 检查 choices 是否为空
+	if len(chatResp.Choices) == 0 {
+		return "", fmt.Errorf("API 返回空结果")
 	}
 
 	return chatResp.Choices[0].Message.Content, nil

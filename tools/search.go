@@ -7,6 +7,20 @@ import (
 	"strings"
 )
 
+// isBinaryFile 根据扩展名判断是否为二进制文件
+func isBinaryFile(path string) bool {
+	binaryExts := map[string]bool{
+		".exe": true, ".bin": true, ".so": true, ".dll": true,
+		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true, ".svg": true,
+		".mp3": true, ".mp4": true, ".avi": true, ".mov": true,
+		".zip": true, ".tar": true, ".gz": true, ".rar": true,
+		".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true,
+		".pyc": true, ".class": true, ".o": true, ".a": true,
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	return binaryExts[ext]
+}
+
 type SearchTool struct{}
 
 func (s *SearchTool) Name() string        { return "search" }
@@ -37,8 +51,12 @@ func (s *SearchTool) Execute(input string) (string, error) {
 			return nil
 		}
 
+		// 跳过二进制文件和常见非文本文件
+		if isBinaryFile(path) {
+			return nil
+		}
+
 		// 读取文件全部内容
-		// 二进制文件（图片、编译产物）会读出乱码或报错，这里统一跳过
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return nil

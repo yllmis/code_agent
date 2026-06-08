@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"go-agents/agent"
 	"go-agents/config"
@@ -44,6 +45,10 @@ func main() {
 		input := scanner.Text()
 		if input == "exit" {
 			break
+		}
+		// 跳过空输入
+		if strings.TrimSpace(input) == "" {
+			continue
 		}
 
 		reply, err := agent.Run(ctx, toolList, input)
