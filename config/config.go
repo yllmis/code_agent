@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	APIKey  string `yaml:"api_key"`
-	Model   string `yaml:"model"`
-	BaseURL string `yaml:"base_url"`
+	APIKey    string `yaml:"api_key"`
+	Model     string `yaml:"model"`
+	BaseURL   string `yaml:"base_url"`
+	MaxRounds int    `yaml:"max_rounds"` // Agent 最大循环轮次
 }
 
 func LoadConfig() (*Config, error) {
@@ -32,6 +33,9 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required")
+	}
+	if cfg.MaxRounds == 0 {
+		cfg.MaxRounds = 10
 	}
 
 	return &cfg, nil

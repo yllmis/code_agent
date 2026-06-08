@@ -22,7 +22,7 @@ go vet ./...            # 静态检查
 - `agent/agent.go` — Agent 核心循环（思考→工具→观察）
 - `tools/` — 具体工具实现（search, read_file, list_files）
 
-依赖流向：`main.go` → `svc.NewServiceContext()` → `agent.Chat(ctx, messages)`
+依赖流向：`main.go` → `svc.NewServiceContext()` → `agent.Chat(svc, messages)`
 
 ## LLM API
 
@@ -33,7 +33,7 @@ go vet ./...            # 静态检查
 
 ## 开发者
 
-Go 后端开发者，在学习 Agent 模式。希望 Claude 提供指导和关键改动点，不要直接给完整实现代码。
+Go 后端开发者，在学习 Agent 模式。当用户没有指出需要设计或修改时，希望 Claude 提供指导和关键改动点，不要直接给完整实现代码。
 
 ## Git 提交规范
 
