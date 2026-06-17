@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -11,8 +13,15 @@ import (
 
 // ToolCall 表示一个工具调用请求
 type ToolCall struct {
-	Name  string
-	Input string
+	Name string
+	Args any
+}
+
+// toolParamTypes 工具参数类型注册表，用于解析 JSON 后转成对应结构体
+var toolParamTypes = map[string]reflect.Type{
+	"search":     reflect.TypeOf(tools.SearchParams{}),
+	"read_file":  reflect.TypeOf(tools.ReadParams{}),
+	"list_files": reflect.TypeOf(tools.ListParams{}),
 }
 
 // Run Agent 核心循环：用户提问 → LLM 思考 → 工具调用 → 观察 → 继续循环
@@ -57,7 +66,7 @@ func Run(svc *svc.ServiceContext, toolList []tools.Tool, userMessage string) (st
 					results[i] = fmt.Sprintf("工具 %q 不存在", tc.Name)
 					return
 				}
-				result, err := tool.Execute(tc.Input)
+				result, err := tool.Execute(tc.Args)
 				if err != nil {
 					results[i] = fmt.Sprintf("工具 %s 执行出错: %v", tc.Name, err)
 					return
@@ -87,18 +96,32 @@ func buildSystemPrompt(toolList []tools.Tool) string {
 	sb.WriteString("你是一个代码助手。你可以使用以下工具：\n\n")
 
 	for _, t := range toolList {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", t.Name(), t.Description()))
+		schema := t.Schema()
+		sb.WriteString(fmt.Sprintf("%s: %s\n", schema.Name, schema.Description))
+		sb.WriteString("  参数:\n")
+		for _, p := range schema.Parameters {
+			required := ""
+			if p.Required {
+				required = "，必填"
+			}
+			sb.WriteString(fmt.Sprintf("    %s (%s%s) - %s\n", p.Name, p.Type, required, p.Description))
+		}
+		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\n当你需要使用工具时，用这个格式：\n")
-	sb.WriteString("<tool>工具名:参数</tool>\n")
+	sb.WriteString("当你需要使用工具时，用这个格式：\n")
+	sb.WriteString("<tool>\nname: 工具名\n参数名: 参数值\n</tool>\n")
 	sb.WriteString("\n可以一次调用多个工具，每个工具用独立的 <tool> 标签包裹。")
 	sb.WriteString("\n请一步步思考，使用工具来帮助回答用户的问题。")
 	return sb.String()
 }
 
 // parseToolCalls 从 LLM 回复中解析所有工具调用
-// 格式：<tool>工具名:参数</tool>，可以有多个
+// 格式：
+// <tool>
+// name: 工具名
+// 参数名: 参数值
+// </tool>
 func parseToolCalls(reply string) []ToolCall {
 	var calls []ToolCall
 	remaining := reply
@@ -111,20 +134,57 @@ func parseToolCalls(reply string) []ToolCall {
 		}
 
 		content := remaining[start+len("<tool>") : end]
-		colonIdx := strings.Index(content, ":")
-		if colonIdx == -1 {
-			remaining = remaining[end+len("</tool>"):]
-			continue
+		lines := strings.Split(strings.TrimSpace(content), "\n")
+
+		argsMap := make(map[string]string)
+		name := ""
+		for _, line := range lines {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			if key == "name" {
+				name = value
+			} else {
+				argsMap[key] = value
+			}
 		}
 
-		name := strings.TrimSpace(content[:colonIdx])
-		input := strings.TrimSpace(content[colonIdx+1:])
-		calls = append(calls, ToolCall{Name: name, Input: input})
+		if name != "" {
+			// 将 map 转成对应的参数结构体
+			args := convertArgs(name, argsMap)
+			calls = append(calls, ToolCall{Name: name, Args: args})
+		}
 
 		remaining = remaining[end+len("</tool>"):]
 	}
 
 	return calls
+}
+
+// convertArgs 将 map[string]string 转成对应的参数结构体
+// 通过 JSON 序列化/反序列化实现
+func convertArgs(toolName string, argsMap map[string]string) any {
+	paramType, ok := toolParamTypes[toolName]
+	if !ok {
+		return argsMap
+	}
+
+	// 将 map 转成 JSON，再反序列化成结构体
+	jsonBytes, err := json.Marshal(argsMap)
+	if err != nil {
+		return argsMap
+	}
+
+	// 创建结构体实例
+	ptr := reflect.New(paramType)
+	if err := json.Unmarshal(jsonBytes, ptr.Interface()); err != nil {
+		return argsMap
+	}
+
+	return ptr.Elem().Interface()
 }
 
 // findTool 根据工具名查找工具
